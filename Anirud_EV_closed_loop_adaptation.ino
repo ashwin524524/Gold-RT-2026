@@ -12,18 +12,29 @@
  * control.
  * 
 */
-#include "AS5600.h"
-AS5600 as5600; 
 
-const int STEP_PIN = 7;
-const int DIR_PIN = 6;
+/* L298n Motor Driver Pins */
+//Pins that control direction of movement
+#define MotorDirPin1 9
+#define MotorDirPin2 10
 
-int buttonState;
-int lastButtonState = LOW;
-unsigned long lastDebounceTime = 0;
-unsigned long debounceDelay = 50;
+//Pin that control motor speed
+#define MotorSpeedPin 11
 
-byte buttonPin = 4;
+volatile unsigned long counter = 0;  //This variable will increase or decrease depending on the rotation of encoder.
+
+double pulsesPerRev = 102; //This vairable sets the pulses/revolution of the encoder. 
+
+//Encoder Pins
+//This code uses attachInterrupt 0 and 1 which are pins 2 and 3 moust Arduino.
+#define EncPinA 2 //Pin for input A
+#define EncPinB 3 //Pin for input B
+
+
+/* Start Button Pin + Variables */
+#define StartButtonPin 8 //Start Button Pin
+
+int start = 0; //Used to start vehicle when button is pressed
 
 float targetTime = 6.0; //s
 const float targetDistance = 699.0; //steps
@@ -44,18 +55,29 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
 
-  pinMode(STEP_PIN, OUTPUT);
-  pinMode(DIR_PIN, OUTPUT);
+  pinMode(MotorDirPin1, OUTPUT);
+  pinMode(MotorDirPin2, OUTPUT);
+  pinMode(MotorSpeedPin, OUTPUT);
 
-  Wire.begin();
+  //Initalize Encoder pins
+  pinMode(EncPinA, INPUT);
+  pinMode(EncPinB, INPUT);
+  digitalWrite(EncPinA, HIGH); // turn on pullup resistors
+  digitalWrite(EncPinB, HIGH); // turn on pullup resistors
 
-  as5600.begin();  //  set direction pin.
-  as5600.setDirection(AS5600_COUNTERCLOCK_WISE);  //  default, just be explicit.
+  //Setting up interrupt
+  //A rising pulse from encodenren activated ai0(). AttachInterrupt 0 is DigitalPin 2 on moust Arduino.
+  attachInterrupt(0, ai0, RISING);
+  //B rising pulse from encodenren activated ai1(). AttachInterrupt 1 is DigitalPin 3 on moust Arduino.
+  attachInterrupt(1, ai1, RISING);
 
-  int b = as5600.isConnected();
-  Serial.print("Connect: ");
-  Serial.println(b);
-
+  while(! start) {
+    if (digitalRead(StartButtonPin) == LOW){
+        Serial.println("pressed");
+        counter = 0;
+        start = 1;
+    }
+  }
   
   
   if(cruiseDist < 0) { //triangular profile
@@ -86,7 +108,6 @@ void setup() {
 
     targetTime = accelTime + cruiseTime + decelTime;
   }
-  while(!button());
 
   Serial.print("accel:"); Serial.println(a);
   Serial.print("vel:"); Serial.println(maxVelocity);
@@ -97,18 +118,11 @@ void setup() {
   long startTime = 0;
   
 
-  as5600.getCumulativePosition();
-  as5600.resetCumulativePosition();
-
-  int sensedSteps;
-
   while(t<=targetTime){
 
     startTime = micros();
 
-    sensedSteps = (int) as5600.getCumulativePosition()/20.48;
-
-    Serial.println(sensedSteps);
+    Serial.println(counter);
 
     if(t < accelTime) { //accel phase
       vel = a *t;
@@ -131,10 +145,7 @@ void setup() {
       currentSteps++;
     }
     */
-    if((sensedSteps+currentSteps)/2 < pos){
-      stepMotor();
-      sensedSteps++;
-    }
+    analogWrite(MotorSpeedPin, 255); 
 
     
     delayMicroseconds(500);
@@ -148,34 +159,24 @@ void loop() {
 
 }
 
-void stepMotor() {
-  digitalWrite(DIR_PIN, HIGH);
-  digitalWrite(STEP_PIN, HIGH);
-  delayMicroseconds(4);  // minimal pulse width for A4988
-  digitalWrite(STEP_PIN, LOW);
-  //delayMicroseconds(1000);
+
+
+void ai0() {
+  // ai0 is activated if DigitalPin nr 2 is going from LOW to HIGH
+  // Check pin 3 to determine the direction
+  if(digitalRead(3)==LOW) {
+    counter++;
+  }else{
+    counter--;
+  }
 }
 
-bool button() {
-  while (true) {
-    int reading = digitalRead(buttonPin);
-
-    // check to see if you just pressed the button
-    // (i.e. the input went from LOW to HIGH), and you've waited long enough
-    // since the last press to ignore any noise:
-
-    // If the switch changed, due to noise or pressing:
-    if (reading != lastButtonState) {
-      // reset the debouncing timer
-      lastDebounceTime = millis();
-    }
-
-    if ((millis() - lastDebounceTime) > debounceDelay) {
-      // if the button state has changed:
-      if (reading != buttonState) {
-        return true;
-      }
-    }
-    lastButtonState = reading;
+void ai1() {
+  // ai1 is activated if DigitalPin nr 3 is going from LOW to HIGH
+  // Check with pin 2 to determine the direction
+  if(digitalRead(2)==LOW) {
+    counter--;
+  }else{
+    counter++;
   }
 }
