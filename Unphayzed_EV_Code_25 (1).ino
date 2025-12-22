@@ -38,7 +38,7 @@ int start = 0; //Used to start vehicle when button is pressed
 
 //This kit uses a 2in diameter (~5.08 cm) wheel. 
 //Adjust variable to wheel that you are using.
-double wheelDiameterCM = 5.08; //Wheel diameter in cm
+double wheelDiameterCM = 7.26; //Wheel diameter in cm
 
 //Adjust variables to change the distance your vehicle travels.
 double targetDistanceM = 8.00; //Target Distance in m
